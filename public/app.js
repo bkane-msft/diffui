@@ -202,7 +202,7 @@ function renderFileCard(f) {
     h('span', { class: 'path', title: f.path }, f.oldPath ? f.oldPath + ' \u2192 ' + f.path : f.path),
     h('span', { class: 'grow' }),
     h('span', { class: 'counts', html: '<span class="add" style="color:var(--add-text)">+' + f.additions + '</span> <span class="del" style="color:var(--del-text)">\u2212' + f.deletions + '</span>' }),
-    canEdit ? h('button', { class: 'btn small', onclick: () => enterEdit(f, body) }, 'Edit') : null,
+    canEdit ? h('button', { class: 'btn small', onclick: () => enterEdit(f, body, head) }, 'Edit') : null,
   ]);
 
   const card = h('div', { class: 'filecard', id: fileCardId(f.path) }, [head, body]);
@@ -227,61 +227,179 @@ function renderFileCard(f) {
   return card;
 }
 
-async function enterEdit(f, body) {
+// ---- Monaco inline editor -----------------------------------------------
+let _monacoPromise = null;
+
+// loadMonaco lazily injects the vendored, embedded Monaco (public/vs) the first
+// time the user edits a file, so plain diff viewing stays Monaco-free and fast.
+function loadMonaco() {
+  if (_monacoPromise) return _monacoPromise;
+  _monacoPromise = new Promise((resolve, reject) => {
+    // Offline web-worker setup: the worker sets its own baseUrl then pulls in
+    // the vendored workerMain from the same origin. No CDN, no network.
+    window.MonacoEnvironment = {
+      getWorkerUrl() {
+        const src =
+          "self.MonacoEnvironment={baseUrl:'" + location.origin + "/vs'};" +
+          "importScripts('" + location.origin + "/vs/base/worker/workerMain.js');";
+        return URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      },
+    };
+    const s = document.createElement('script');
+    s.src = '/vs/loader.js';
+    s.onload = () => {
+      window.require.config({ paths: { vs: '/vs' } });
+      window.require(
+        ['vs/editor/editor.main'],
+        () => {
+          const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          window.monaco.editor.setTheme(dark ? 'vs-dark' : 'vs');
+          resolve(window.monaco);
+        },
+        reject
+      );
+    };
+    s.onerror = () => reject(new Error('failed to load /vs/loader.js'));
+    document.head.appendChild(s);
+  });
+  return _monacoPromise;
+}
+
+// langForPath maps a path to a Monaco language id using Monaco's own registry.
+function langForPath(monaco, p) {
+  const base = p.split('/').pop();
+  const dot = base.lastIndexOf('.');
+  const ext = dot >= 0 ? base.slice(dot).toLowerCase() : '';
+  for (const l of monaco.languages.getLanguages()) {
+    if ((l.filenames || []).some((fn) => fn === base)) return l.id;
+    if (ext && (l.extensions || []).some((e) => e.toLowerCase() === ext)) return l.id;
+  }
+  return 'plaintext';
+}
+
+function countsHTML(f) {
+  return (
+    '<span class="add" style="color:var(--add-text)">+' + f.additions + '</span> ' +
+    '<span class="del" style="color:var(--del-text)">\u2212' + f.deletions + '</span>'
+  );
+}
+
+// updateCounts refreshes the card head, sidebar row, and header totals in place
+// after a save, without tearing down the open editor.
+function updateCounts(head, f) {
+  const s = App.session;
+  const hc = head.querySelector('.counts');
+  if (hc) hc.innerHTML = countsHTML(f);
+  document.querySelectorAll('.filelist li').forEach((li) => {
+    if (li.getAttribute('data-path') !== f.path) return;
+    const c = li.querySelector('.counts');
+    if (c) {
+      c.innerHTML =
+        '<span class="add">+' + f.additions + '</span> ' +
+        '<span class="del">\u2212' + f.deletions + '</span>';
+    }
+  });
+  let addT = 0;
+  let delT = 0;
+  for (const x of s.files) {
+    addT += x.additions;
+    delT += x.deletions;
+  }
+  document.getElementById('totals').innerHTML =
+    '<span class="add" style="color:var(--add-text)">+' + addT + '</span> ' +
+    '<span class="del" style="color:var(--del-text)">\u2212' + delT + '</span>';
+}
+
+async function enterEdit(f, body, head) {
   body.innerHTML = '';
-  body.appendChild(h('div', { class: 'empty' }, 'Loading file\u2026'));
-  let content;
+  body.appendChild(h('div', { class: 'empty' }, 'Loading editor\u2026'));
+
+  let data;
+  let monaco;
   try {
-    const data = await api('/api/file?path=' + encodeURIComponent(f.path));
-    content = data.content;
+    [data, monaco] = await Promise.all([
+      api('/api/file?path=' + encodeURIComponent(f.path)),
+      loadMonaco(),
+    ]);
   } catch (e) {
     body.innerHTML = '';
-    body.appendChild(h('div', { class: 'banner' }, e.message));
+    body.appendChild(h('div', { class: 'banner' }, 'Editor failed to load: ' + e.message));
     return;
   }
 
-  const ta = h('textarea', { class: 'editor', spellcheck: 'false' });
-  ta.value = content;
+  const container = h('div', { class: 'monaco-host' });
+  const saveBtn = h('button', { class: 'btn small primary' }, 'Save');
+  const doneBtn = h('button', { class: 'btn small' }, 'Done');
+  const bar = h('div', { class: 'editor-bar' }, [
+    h('span', { class: 'hint' }, 'Editing working file inline \u2014 changes re-diff live; \u2318S / Ctrl+S saves to disk.'),
+    doneBtn,
+    saveBtn,
+  ]);
+  body.innerHTML = '';
+  body.appendChild(h('div', { class: 'editor-wrap' }, [container, bar]));
+
+  const lang = langForPath(monaco, f.path);
+  const original = monaco.editor.createModel(data.base || '', lang);
+  const modified = monaco.editor.createModel(data.content || '', lang);
+  const diffEditor = monaco.editor.createDiffEditor(container, {
+    renderSideBySide: false, // single inline column (whole-file, diff-highlighted)
+    automaticLayout: false,
+    readOnly: false,
+    originalEditable: false,
+    scrollBeyondLastLine: false,
+    hideUnchangedRegions: { enabled: false }, // show the whole file, GitHub-style
+    minimap: { enabled: false },
+    renderOverviewRuler: false,
+    overviewRulerLanes: 0,
+    lineNumbersMinChars: 4,
+    fontSize: 12.5,
+    // Let the page own vertical scrolling so all files scroll as one document.
+    scrollbar: { vertical: 'hidden', alwaysConsumeMouseWheel: false },
+  });
+  diffEditor.setModel({ original, modified });
+
+  const modEd = diffEditor.getModifiedEditor();
+  const fit = () => {
+    const hgt = Math.max(modEd.getContentHeight(), 30);
+    container.style.height = hgt + 'px';
+    diffEditor.layout({ width: container.clientWidth, height: hgt });
+  };
+  const sizeSub = modEd.onDidContentSizeChange(fit);
+  const diffSub = diffEditor.onDidUpdateDiff(fit);
+  requestAnimationFrame(fit);
+
   const save = async () => {
     try {
       const res = await api('/api/file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: f.path, content: ta.value }),
+        body: JSON.stringify({ path: f.path, content: modEd.getValue() }),
       });
       f.additions = res.additions;
       f.deletions = res.deletions;
+      updateCounts(head, f);
       toast('Saved ' + f.path);
-      // refresh sidebar counts + re-render this card's diff
-      render();
-      scrollToFile(f.path);
     } catch (e) {
       toast('Save failed: ' + e.message);
     }
   };
-  ta.addEventListener('keydown', (ev) => {
-    if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') {
-      ev.preventDefault();
-      save();
-    }
-    if (ev.key === 'Tab') {
-      ev.preventDefault();
-      const start = ta.selectionStart;
-      const end = ta.selectionEnd;
-      ta.value = ta.value.slice(0, start) + '\t' + ta.value.slice(end);
-      ta.selectionStart = ta.selectionEnd = start + 1;
-    }
+  modEd.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, save);
+  saveBtn.addEventListener('click', save);
+
+  body._cleanup = () => {
+    sizeSub.dispose();
+    diffSub.dispose();
+    diffEditor.dispose();
+    original.dispose();
+    modified.dispose();
+    body._cleanup = null;
+  };
+  doneBtn.addEventListener('click', () => {
+    body._cleanup();
+    reloadCard(f, body);
   });
 
-  const bar = h('div', { class: 'editor-bar' }, [
-    h('span', { class: 'hint' }, 'Editing working file \u2014 \u2318S / Ctrl+S to save. Writes straight to disk.'),
-    h('button', { class: 'btn small', onclick: () => reloadCard(f, body) }, 'Cancel'),
-    h('button', { class: 'btn small primary', onclick: save }, 'Save'),
-  ]);
-
-  body.innerHTML = '';
-  body.appendChild(h('div', { class: 'editor-wrap' }, [ta, bar]));
-  ta.focus();
+  modEd.focus();
 }
 
 function reloadCard(f, body) {

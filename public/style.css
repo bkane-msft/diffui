@@ -228,6 +228,18 @@ html, body {
 }
 
 .editor-wrap { display: flex; flex-direction: column; }
+
+/* Monaco inline diff editor host. Height is set in JS to the editor's content
+   height so the page (not the editor) owns vertical scrolling. */
+.monaco-host {
+  width: 100%;
+  min-height: 30px;
+}
+.monaco-host .monaco-editor,
+.monaco-host .monaco-diff-editor {
+  --vscode-editor-background: var(--bg);
+}
+
 .editor {
   width: 100%;
   min-height: 320px;

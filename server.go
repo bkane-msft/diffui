@@ -192,7 +192,8 @@ func (s *DifuiServer) Handler() http.Handler {
 				writeJSON(w, 500, map[string]string{"error": err.Error()})
 				return
 			}
-			writeJSON(w, 200, map[string]string{"path": file, "content": content})
+			base, _ := readBaseFile(spec, file, s.root)
+			writeJSON(w, 200, map[string]string{"path": file, "content": content, "base": base})
 		case http.MethodPost:
 			var body struct {
 				Path    string `json:"path"`

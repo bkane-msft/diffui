@@ -1,7 +1,7 @@
 BINARY := git-diffui
 PREFIX ?= $(HOME)/.local/bin
 
-.PHONY: build test cover vet run install install-local clean
+.PHONY: build test cover vet run install install-local clean vendor-monaco
 
 build:
 	go build -o $(BINARY) .
@@ -29,3 +29,7 @@ install-local: build
 
 clean:
 	rm -f $(BINARY)
+
+# Re-vendor the embedded Monaco editor (public/vs). Pass V=<version> to bump.
+vendor-monaco:
+	MONACO_VERSION=$(V) scripts/vendor-monaco.sh

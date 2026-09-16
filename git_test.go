@@ -85,3 +85,29 @@ func TestCountDiff(t *testing.T) {
 	assert.Equal(t, 2, add)
 	assert.Equal(t, 1, del)
 }
+
+func TestBaseRevForSpec(t *testing.T) {
+	assert.Equal(t, "", baseRevForSpec([]string{}))
+	assert.Equal(t, "", baseRevForSpec([]string{"--cached"}))
+	assert.Equal(t, "HEAD", baseRevForSpec([]string{"HEAD"}))
+	assert.Equal(t, "HEAD", baseRevForSpec([]string{"--stat", "HEAD"}))
+	assert.Equal(t, "a", baseRevForSpec([]string{"a", "b"}))
+}
+
+func TestReadBaseFile(t *testing.T) {
+	dir := newTestRepo(t)
+
+	// Modified file: base is the committed HEAD version.
+	base, err := readBaseFile([]string{"HEAD"}, "a.txt", dir)
+	require.NoError(t, err)
+	assert.Equal(t, "line1\nline2\nline3\n", base)
+
+	// Added file absent from HEAD: empty base, no error.
+	base, err = readBaseFile([]string{"HEAD"}, "c.txt", dir)
+	require.NoError(t, err)
+	assert.Equal(t, "", base)
+
+	// Path traversal is rejected.
+	_, err = readBaseFile([]string{"HEAD"}, "../escape", dir)
+	assert.Error(t, err)
+}

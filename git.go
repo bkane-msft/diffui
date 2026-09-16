@@ -212,6 +212,38 @@ func resolveInRepo(root, rel string) (string, error) {
 	return full, nil
 }
 
+// baseRevForSpec returns the revision forming the base (left) side of the diff,
+// or "" to mean the index. Flags are skipped; the first revision wins.
+func baseRevForSpec(spec []string) string {
+	for _, a := range spec {
+		if strings.HasPrefix(a, "-") {
+			continue
+		}
+		return a
+	}
+	return ""
+}
+
+// readBaseFile returns the base-side (original) content of a file for the given
+// diff spec, using `git show <rev>:<path>` (or `:<path>` for the index). If the
+// file does not exist on the base side (e.g. a newly added file, or an empty
+// tree in a repo with no commits), it returns an empty string with no error.
+func readBaseFile(spec []string, rel, dir string) (string, error) {
+	if _, err := resolveInRepo(dir, rel); err != nil {
+		return "", err
+	}
+	ref := ":" + rel
+	if base := baseRevForSpec(spec); base != "" {
+		ref = base + ":" + rel
+	}
+	out, err := gitOutput(dir, "show", ref)
+	if err != nil {
+		// Not present on the base side -> treat as empty (added file).
+		return "", nil
+	}
+	return string(out), nil
+}
+
 func readWorkingFile(root, rel string) (string, error) {
 	full, err := resolveInRepo(root, rel)
 	if err != nil {

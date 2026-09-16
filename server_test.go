@@ -84,6 +84,7 @@ func TestAPIEditFlow(t *testing.T) {
 	rec, out := doJSON(t, h, "GET", "/api/file?path=a.txt", nil)
 	require.Equalf(t, 200, rec.Code, "get file: %v", out)
 	assert.Contains(t, out["content"].(string), "line2 CHANGED")
+	assert.Equal(t, "line1\nline2\nline3\n", out["base"], "base should be the HEAD version")
 
 	rec, out = doJSON(t, h, "POST", "/api/file", map[string]string{
 		"path":    "a.txt",
