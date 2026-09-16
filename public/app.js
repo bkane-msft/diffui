@@ -310,6 +310,29 @@ async function mountDiffEditor(f, body, head, actions) {
   const diffEditor = monaco.editor.createDiffEditor(host, diffOpts(!editable));
   diffEditor.setModel({ original, modified });
 
+  // Monaco's inline diff attaches a mousedown handler to deleted-line view
+  // zones (InlineDiffDeletedCodeMargin) that calls preventDefault() and pops a
+  // "Copy deleted lines / Revert this change" context menu. That preventDefault
+  // blocks normal text selection on deleted lines, so they behave differently
+  // from added lines. Monaco offers no option to disable it and the class is
+  // module-private, so intercept the event in the capture phase before Monaco
+  // sees it. Monaco layers a transparent .view-lines overlay above the deleted
+  // content, so the event target is that overlay rather than the .line-delete
+  // node -- probe the full hit-stack at the cursor to detect a deleted zone.
+  const DELETED_SEL = '.line-delete, .inline-deleted-margin-view-zone';
+  const overDeletedZone = (e) => {
+    const t = e.target;
+    if (t instanceof Element && t.closest(DELETED_SEL)) return true;
+    for (const el of document.elementsFromPoint(e.clientX, e.clientY)) {
+      if (el.closest(DELETED_SEL)) return true;
+    }
+    return false;
+  };
+  const stopDeletedMenu = (e) => {
+    if (overDeletedZone(e)) e.stopImmediatePropagation();
+  };
+  host.addEventListener('mousedown', stopDeletedMenu, true);
+
   const modEd = diffEditor.getModifiedEditor();
   let expanded = false;
   let capped = false;
@@ -387,6 +410,7 @@ async function mountDiffEditor(f, body, head, actions) {
       disposed = true;
       cancelAnimationFrame(frame);
       window.removeEventListener('resize', fit);
+      host.removeEventListener('mousedown', stopDeletedMenu, true);
       sizeSub.dispose();
       diffSub.dispose();
       changeSub?.dispose();

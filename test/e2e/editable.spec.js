@@ -283,3 +283,29 @@ test('deleted file renders a read-only Monaco editor with no Save button', async
   await expect(page.locator(`${cardSel(EDITABLE.deleted)} .monaco-diff-editor`)).toBeVisible();
   await expect(page.locator(`${cardSel(EDITABLE.deleted)} .card-actions button:has-text("Save")`)).toHaveCount(0);
 });
+
+test('clicking a deleted line does not open Monaco\'s deleted-code context menu', async ({ page }) => {
+  await page.goto(server.baseURL);
+  await page.waitForSelector('.filecard');
+  // small.js drops its baseline "return a + b;" line, so the inline diff renders
+  // a deleted view zone (.line-delete). Monaco normally pops a "Copy deleted
+  // lines / Revert this change" menu and preventDefaults selection there; app.js
+  // intercepts the mousedown so deleted lines behave like added lines.
+  await mountCard(page, EDITABLE.small);
+
+  const deleted = page.locator(`${cardSel(EDITABLE.small)} .view-lines.line-delete`).first();
+  await expect(deleted).toBeVisible();
+  // Sticky card headers overlay the top of the diff and would intercept the
+  // click; disable their pointer events so the click reaches the editor.
+  await page.addStyleTag({ content: '.filecard-head{pointer-events:none!important}' });
+  await deleted.scrollIntoViewIfNeeded();
+  // Monaco layers a transparent overlay above the deleted content, so click by
+  // coordinates (as a user does) rather than by element target.
+  const box = await deleted.boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // No context menu (Monaco renders it as .monaco-menu with these actions).
+  await expect(page.locator('.monaco-menu')).toHaveCount(0);
+  await expect(page.getByText('Copy deleted lines', { exact: false })).toHaveCount(0);
+  await expect(page.getByText('Revert this change', { exact: false })).toHaveCount(0);
+});

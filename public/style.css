@@ -261,6 +261,9 @@ html, body {
 .monaco-host .monaco-diff-editor {
   --vscode-editor-background: var(--bg);
 }
+/* The deleted-line context menu is neutralized in app.js, so hide its
+   now-inert lightbulb hover affordance to match the added-line side. */
+.monaco-host .inline-deleted-margin-view-zone .lightbulb-glyph { display: none; }
 
 .card-actions { display: inline-flex; gap: 6px; }
 .monaco-wrap { position: relative; }
