@@ -49,6 +49,32 @@ Options: `-p/--port <n>`, `--host <h>`, `--no-open`, `--staged` (`--cached`), `-
 > Note: git intercepts `git diffui --help` to look for a man page. Use `git diffui -h`
 > or `git-diffui -h` for the built-in help.
 
+## Shell completion
+
+Make `git diffui <TAB>` complete branches, tags, and commits (including
+`a..b` ranges) plus the flags above — just like `git diff <TAB>`. The scripts
+live in [`completions/`](completions/) and reuse git's own ref-completion
+helpers, so git's completion must be loaded first (it usually is).
+
+**bash** — source it from `~/.bashrc`, after git's completion:
+
+```bash
+source /path/to/diffui/completions/git-diffui.bash
+```
+
+**zsh** — install it on your `$fpath` as `_git-diffui`, then run `compinit`:
+
+```zsh
+mkdir -p ~/.zsh/completions
+cp /path/to/diffui/completions/git-diffui.zsh ~/.zsh/completions/_git-diffui
+# in ~/.zshrc, before compinit:
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
+```
+
+Both cover the `git diffui` subcommand form and the standalone `git-diffui`
+binary. See the header comment in each file for details.
+
 ## In the browser
 
 - **Sidebar**: file list with status + `+/-` counts; click to jump to a file.
@@ -121,6 +147,7 @@ git.go           git plumbing: name-status/numstat parsing, per-file diff, safe 
 server.go        HTTP handlers + session state (computeEditable, labelFor)
 history.go       per-repo history persistence
 public/          vanilla-JS single-page UI (embedded into the binary)
+completions/     bash + zsh shell completion for `git diffui`
 *_test.go        test suite
 ```
 
