@@ -64,3 +64,30 @@ test('read-only file renders a read-only Monaco editor with syntax highlighting 
   // The read-only diff still shows the staged change.
   await expect(page.locator('#file-ro_js')).toContainText('export const value = 2;');
 });
+
+test('read-only deleted lines are selectable and open no context menu', async ({ page }) => {
+  await page.goto(server.baseURL);
+  await page.waitForSelector('.filecard');
+  await page.click('li[data-path="ro.js"]');
+
+  // Replacing `value = 1;` with `value = 2;` renders the old line as a deleted
+  // view zone in the inline diff. Deleted-line selection/menu suppression must
+  // work on read-only diffs too, since they share the same Monaco mount path.
+  const deleted = page.locator('#file-ro_js .view-lines.line-delete').first();
+  await deleted.waitFor({ state: 'visible', timeout: 20_000 });
+  await page.addStyleTag({ content: '.filecard-head{pointer-events:none!important}' });
+  await deleted.scrollIntoViewIfNeeded();
+  const box = await deleted.boundingBox();
+  const y = box.y + box.height / 2;
+
+  await page.evaluate(() => getSelection().removeAllRanges());
+  await page.mouse.move(box.x + 2, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + Math.max(box.width - 4, 40), y, { steps: 8 });
+  await page.mouse.up();
+  const selected = await page.evaluate(() => getSelection().toString());
+  expect(selected.replace(/\u00a0/g, ' ')).toContain('export const value = 1;');
+
+  await page.mouse.click(box.x + box.width / 2, y);
+  await expect(page.locator('.monaco-menu')).toHaveCount(0);
+});
