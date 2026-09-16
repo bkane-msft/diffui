@@ -264,6 +264,18 @@ html, body {
 /* The deleted-line context menu is neutralized in app.js, so hide its
    now-inert lightbulb hover affordance to match the added-line side. */
 .monaco-host .inline-deleted-margin-view-zone .lightbulb-glyph { display: none; }
+/* Monaco renders deleted lines as view zones that sit UNDER the modified
+   editor's .view-lines overlay (later DOM sibling paints on top) and inherit
+   user-select:none, so they can't be selected natively -- unlike added lines,
+   which use Monaco's own model-based selection. Lift the view zones above the
+   overlay for hit-testing and re-enable text selection so deleted lines
+   select/copy with normal browser actions. */
+.monaco-host .view-zones { z-index: 1; }
+.monaco-host .view-zones .line-delete,
+.monaco-host .view-zones .line-delete * {
+  user-select: text;
+  -webkit-user-select: text;
+}
 
 .card-actions { display: inline-flex; gap: 6px; }
 .monaco-wrap { position: relative; }
