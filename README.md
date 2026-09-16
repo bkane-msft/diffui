@@ -78,7 +78,10 @@ autoload -Uz compinit && compinit
 
 If you'd rather not edit your rc files by hand, `make install-completions`
 saves the zsh completion onto `~/.zsh/completions` (override with
-`ZSH_COMPLETIONS_DIR=…`) and prints the bash setup line for you.
+`ZSH_COMPLETIONS_DIR=…`) and prints the bash setup line for you. Point
+`ZSH_COMPLETIONS_DIR` at a directory that's already on your `$fpath` (check
+with `print -l $fpath`), otherwise zsh won't pick the file up — the default
+`~/.zsh/completions` only works if you've added it to `$fpath` as shown above.
 
 The raw scripts also live in [`completions/`](completions/) if you want to
 source them directly. Both cover the `git diffui` subcommand form and the

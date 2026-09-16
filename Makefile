@@ -36,7 +36,8 @@ install-completions:
 	@install -d $(ZSH_COMPLETIONS_DIR)
 	@install -m 0644 completions/git-diffui.zsh $(ZSH_COMPLETIONS_DIR)/_git-diffui
 	@echo "zsh:  installed $(ZSH_COMPLETIONS_DIR)/_git-diffui"
-	@echo "      if it's not already, add to ~/.zshrc BEFORE compinit:"
+	@echo "      NOTE: that dir must be on your \$$fpath (check: print -l \$$fpath)."
+	@echo "      If it isn't, add to ~/.zshrc BEFORE compinit:"
 	@echo "          fpath=($(ZSH_COMPLETIONS_DIR) \$$fpath)"
 	@echo "          autoload -Uz compinit && compinit"
 	@echo "bash: add to ~/.bashrc (after git's completion is loaded):"
