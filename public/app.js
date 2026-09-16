@@ -18,10 +18,6 @@ function h(tag, attrs, children) {
   return el;
 }
 
-function esc(s) {
-  return s.replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
-}
-
 async function api(pathname, opts) {
   const res = await fetch(pathname, opts);
   const data = await res.json().catch(() => ({}));
@@ -38,85 +34,6 @@ function toast(msg) {
 }
 
 const STATUS_LABEL = { A: 'A', M: 'M', D: 'D', R: 'R', C: 'C', T: 'M' };
-
-// ---- unified diff parsing -----------------------------------------------
-function parseDiff(text) {
-  const rows = [];
-  let oldLn = 0;
-  let newLn = 0;
-  const lines = text.split('\n');
-  for (const line of lines) {
-    if (
-      line.startsWith('diff --git') ||
-      line.startsWith('index ') ||
-      line.startsWith('--- ') ||
-      line.startsWith('+++ ') ||
-      line.startsWith('old mode') ||
-      line.startsWith('new mode') ||
-      line.startsWith('similarity ') ||
-      line.startsWith('dissimilarity ') ||
-      line.startsWith('rename ') ||
-      line.startsWith('copy ') ||
-      line.startsWith('new file mode') ||
-      line.startsWith('deleted file mode')
-    ) {
-      continue;
-    }
-    if (line.startsWith('@@')) {
-      const m = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)/.exec(line);
-      if (m) {
-        oldLn = parseInt(m[1], 10);
-        newLn = parseInt(m[2], 10);
-        rows.push({ type: 'hunk', text: line });
-      }
-      continue;
-    }
-    if (line.startsWith('\\')) {
-      rows.push({ type: 'meta', text: line });
-      continue;
-    }
-    const sign = line[0];
-    const body = line.slice(1);
-    if (sign === '+') rows.push({ type: 'add', newLn: newLn++, text: body });
-    else if (sign === '-') rows.push({ type: 'del', oldLn: oldLn++, text: body });
-    else rows.push({ type: 'ctx', oldLn: oldLn++, newLn: newLn++, text: body });
-  }
-  return rows;
-}
-
-function renderDiffTable(text) {
-  const rows = parseDiff(text);
-  if (rows.length === 0) return h('div', { class: 'nochange' }, 'No textual changes.');
-  const tbody = h('tbody');
-  for (const r of rows) {
-    if (r.type === 'hunk') {
-      tbody.appendChild(
-        h('tr', { class: 'row-hunk' }, [h('td', { colspan: '3', html: esc(r.text) })])
-      );
-      continue;
-    }
-    if (r.type === 'meta') {
-      tbody.appendChild(
-        h('tr', { class: 'row-meta' }, [
-          h('td', { class: 'ln' }, ''),
-          h('td', { class: 'ln' }, ''),
-          h('td', { class: 'code', html: '<span class="ro-note">' + esc(r.text) + '</span>' }),
-        ])
-      );
-      continue;
-    }
-    const cls = r.type === 'add' ? 'row-add' : r.type === 'del' ? 'row-del' : 'row-ctx';
-    const sign = r.type === 'add' ? '+' : r.type === 'del' ? '-' : ' ';
-    tbody.appendChild(
-      h('tr', { class: cls }, [
-        h('td', { class: 'ln' }, r.oldLn != null ? String(r.oldLn) : ''),
-        h('td', { class: 'ln' }, r.newLn != null ? String(r.newLn) : ''),
-        h('td', { class: 'code', html: '<span class="sign">' + sign + '</span>' + esc(r.text) }),
-      ])
-    );
-  }
-  return h('table', { class: 'diff-table' }, [tbody]);
-}
 
 // ---- app state -----------------------------------------------------------
 const App = {
@@ -220,11 +137,6 @@ function renderFileCard(f) {
   if (f.binary) {
     body.innerHTML = '';
     body.appendChild(h('div', { class: 'binary' }, 'Binary file \u2014 not shown.'));
-    return card;
-  }
-
-  if (!App.session.editable || f.status === 'D') {
-    htmlDiffFallback(f, body);
     return card;
   }
 
@@ -354,7 +266,9 @@ function updateCounts(head, f) {
 
 async function mountDiffEditor(f, body, head, actions) {
   const editors = App._editors;
-  const editable = !!App.session.editable;
+  // Read-only diffs (staged, ref-to-ref, ranges) and deletions render Monaco
+  // read-only: syntax-highlighted and consistent, but never editable/saved.
+  const editable = !!App.session.editable && f.status !== 'D';
   let data;
   let monaco;
   try {
@@ -364,8 +278,7 @@ async function mountDiffEditor(f, body, head, actions) {
     ]);
   } catch (e) {
     if (editors !== App._editors) return;
-    toast('Editor failed to load: ' + e.message);
-    htmlDiffFallback(f, body);
+    body.replaceChildren(h('div', { class: 'banner' }, 'Editor failed to load: ' + e.message));
     return;
   }
   // A diff switch may have removed this card while its assets were loading.
@@ -468,20 +381,6 @@ async function mountDiffEditor(f, body, head, actions) {
       modified.dispose();
     },
   });
-}
-
-function htmlDiffFallback(f, body) {
-  body.innerHTML = '';
-  body.appendChild(h('div', { class: 'empty' }, 'Loading\u2026'));
-  api('/api/diff?path=' + encodeURIComponent(f.path))
-    .then((d) => {
-      body.innerHTML = '';
-      body.appendChild(renderDiffTable(d.diff));
-    })
-    .catch((e) => {
-      body.innerHTML = '';
-      body.appendChild(h('div', { class: 'banner' }, e.message));
-    });
 }
 
 // ---- modals --------------------------------------------------------------

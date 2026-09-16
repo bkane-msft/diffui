@@ -176,10 +176,7 @@ func (s *DifuiServer) Handler() http.Handler {
 
 	mux.HandleFunc("/api/file", func(w http.ResponseWriter, r *http.Request) {
 		spec := s.currentSpec()
-		if !computeEditable(spec) {
-			writeJSON(w, 403, map[string]string{"error": "read-only diff"})
-			return
-		}
+		editable := computeEditable(spec)
 		switch r.Method {
 		case http.MethodGet:
 			file := r.URL.Query().Get("path")
@@ -187,14 +184,17 @@ func (s *DifuiServer) Handler() http.Handler {
 				writeJSON(w, 400, map[string]string{"error": "missing path"})
 				return
 			}
-			content, err := readWorkingFile(s.root, file)
+			base, content, err := fileSides(spec, file, s.root)
 			if err != nil {
 				writeJSON(w, 500, map[string]string{"error": err.Error()})
 				return
 			}
-			base, _ := readBaseFile(spec, file, s.root)
-			writeJSON(w, 200, map[string]string{"path": file, "content": content, "base": base})
+			writeJSON(w, 200, map[string]any{"path": file, "content": content, "base": base, "editable": editable})
 		case http.MethodPost:
+			if !editable {
+				writeJSON(w, 403, map[string]string{"error": "read-only diff"})
+				return
+			}
 			var body struct {
 				Path    string `json:"path"`
 				Content string `json:"content"`

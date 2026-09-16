@@ -244,6 +244,101 @@ func readBaseFile(spec []string, rel, dir string) (string, error) {
 	return string(out), nil
 }
 
+// diffSides resolves the base (left) and target (right) sides of a diff spec for
+// content reads. baseRev and targetRev are git revisions to feed `git show
+// <rev>:<path>`; an empty string means the index (":<path>"). When targetWorking
+// is true the target side is the working tree on disk rather than a revision.
+func diffSides(spec []string) (baseRev, targetRev string, targetWorking bool) {
+	staged := false
+	revs := []string{}
+	for _, a := range spec {
+		switch {
+		case a == "--cached" || a == "--staged":
+			staged = true
+		case strings.HasPrefix(a, "-"):
+			// other flags don't select a side
+		default:
+			revs = append(revs, a)
+		}
+	}
+	if staged {
+		// git diff --cached: HEAD -> index.
+		return "HEAD", "", false
+	}
+	switch len(revs) {
+	case 0:
+		// git diff: index -> working tree.
+		return "", "", true
+	case 1:
+		r := revs[0]
+		if strings.Contains(r, "..") {
+			sep := ".."
+			if strings.Contains(r, "...") {
+				sep = "..."
+			}
+			parts := strings.SplitN(r, sep, 2)
+			a, b := parts[0], ""
+			if len(parts) > 1 {
+				b = parts[1]
+			}
+			if a == "" {
+				a = "HEAD"
+			}
+			if b == "" {
+				b = "HEAD"
+			}
+			return a, b, false
+		}
+		// single rev: rev -> working tree.
+		return r, "", true
+	default:
+		return revs[0], revs[1], false
+	}
+}
+
+// showFile returns a file's content at a git revision. An empty rev reads the
+// index (":<path>"). A file missing on that side (added or deleted) yields an
+// empty string and no error, so the caller can render it as an add/delete.
+func showFile(dir, rev, rel string) (string, error) {
+	if _, err := resolveInRepo(dir, rel); err != nil {
+		return "", err
+	}
+	ref := ":" + rel
+	if rev != "" {
+		ref = rev + ":" + rel
+	}
+	out, err := gitOutput(dir, "show", ref)
+	if err != nil {
+		return "", nil
+	}
+	return string(out), nil
+}
+
+// fileSides returns the base (original) and target (modified) content for a file
+// under a diff spec, ready to feed the inline diff editor for any spec —
+// editable (working tree) or read-only (staged, two-revision, or range).
+func fileSides(spec []string, rel, dir string) (base, content string, err error) {
+	baseRev, targetRev, targetWorking := diffSides(spec)
+	if base, err = showFile(dir, baseRev, rel); err != nil {
+		return "", "", err
+	}
+	if targetWorking {
+		content, err = readWorkingFile(dir, rel)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// Deleted in the working tree -> empty target side.
+				return base, "", nil
+			}
+			return "", "", err
+		}
+		return base, content, nil
+	}
+	if content, err = showFile(dir, targetRev, rel); err != nil {
+		return "", "", err
+	}
+	return base, content, nil
+}
+
 func readWorkingFile(root, rel string) (string, error) {
 	full, err := resolveInRepo(root, rel)
 	if err != nil {

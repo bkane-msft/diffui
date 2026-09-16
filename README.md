@@ -52,12 +52,14 @@ Options: `-p/--port <n>`, `--host <h>`, `--no-open`, `--staged` (`--cached`), `-
 ## In the browser
 
 - **Sidebar**: file list with status + `+/-` counts; click to jump to a file.
-- **Inline editing** (editable views): syntax-highlighted Monaco diffs load as
-  cards approach the viewport, without an Edit button. Small diffs show at full
-  height; large unchanged gaps collapse with clickable expanders. Cards taller
-  than 600px have an **Expand / Collapse** toggle.
-  **Save** enables when you edit; `⌘S` / `Ctrl+S` saves to disk and re-diffs.
-  Deleted files and read-only comparisons use textual diff tables.
+- **Diffs render in Monaco** for every view — syntax-highlighted, consistent UI.
+  Editors mount lazily as cards approach the viewport, without an Edit button.
+  Small diffs show at full height; large unchanged gaps collapse with clickable
+  expanders. Cards taller than 600px have an **Expand / Collapse** toggle.
+- **Inline editing** (editable views only): **Save** enables when you edit;
+  `⌘S` / `Ctrl+S` saves to disk and re-diffs. Read-only comparisons (historical,
+  `--staged`, ranges) and deleted files render the same Monaco diff but read-only
+  — no Save, no writes.
 - **Compare…**: diff any two revisions (or one commit vs your working tree).
 - **History**: reopen any past diff for this repo.
 
@@ -103,9 +105,9 @@ Coverage:
   to disk and update the add/delete counts, and the keybinding is scoped
   per-card (saving one editor never touches another).
 - Re-rendering disposes editors with no leaked Monaco models.
-- Binary files show the binary banner, deleted files fall back to a textual diff
-  table, and read-only specs (e.g. `--staged`) refuse inline editing — all with
-  no Monaco.
+- Binary files show the binary banner (no Monaco). Deleted files and read-only
+  specs (e.g. `--staged`) render a read-only Monaco diff — syntax-highlighted but
+  with no Save button and writes refused by the API.
 
 ## Project layout
 
@@ -122,8 +124,10 @@ public/          vanilla-JS single-page UI (embedded into the binary)
 
 - `GET /api/session` — current diff: repo, editable flag, label, file list.
 - `GET /api/diff?path=…` — unified diff text for one file.
-- `GET /api/file?path=…` — working-file content (editable views only).
+- `GET /api/file?path=…` — original + working/target content for a file, plus the
+  `editable` flag. Served for any spec so read-only diffs render in Monaco too.
 - `POST /api/file` `{path, content}` — write file to disk, return re-diff + counts.
+  Rejected with `403` on read-only diffs.
 - `POST /api/switch` `{spec:[…]}` — change the diff spec (validated); returns a session.
 - `GET /api/history` — past diffs for this repo.
 

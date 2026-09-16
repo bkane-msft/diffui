@@ -221,7 +221,10 @@ test('re-render disposes editors with no leaked Monaco models', async ({ page })
   };
 
   const first = await mountAll();
-  expect(first).toBe(editableCode.length * 2); // one original + one modified model per card
+  // At least one original + one modified model per explicitly mounted card.
+  // (Adjacent read-only cards, e.g. the deleted file, may also lazy-mount when
+  // scrolled near, so assert a lower bound rather than an exact count.)
+  expect(first).toBeGreaterThanOrEqual(editableCode.length * 2);
 
   // Trigger a full re-render (Refresh -> loadSession -> disposeEditors).
   await page.click('#refreshBtn');
@@ -243,11 +246,17 @@ test('binary file shows the binary banner and no Monaco', async ({ page }) => {
   await expect(page.locator(`${cardSel(EDITABLE.binary)} .monaco-diff-editor`)).toHaveCount(0);
 });
 
-test('deleted file falls back to a textual diff table with no Monaco', async ({ page }) => {
+test('deleted file renders a read-only Monaco editor with no Save button', async ({ page }) => {
   await page.goto(server.baseURL);
   await page.waitForSelector('.filecard');
   await page.click(`li[data-path="${EDITABLE.deleted}"]`);
+  await page.evaluate((sel) => {
+    document.querySelector(sel)?.scrollIntoView({ block: 'center' });
+  }, cardSel(EDITABLE.deleted));
 
-  await expect(page.locator(`${cardSel(EDITABLE.deleted)} .diff-table`)).toBeVisible();
-  await expect(page.locator(`${cardSel(EDITABLE.deleted)} .monaco-diff-editor`)).toHaveCount(0);
+  // Deletions render in Monaco too (original vs empty), but read-only so a save
+  // can't accidentally un-delete the file.
+  await page.waitForSelector(`${cardSel(EDITABLE.deleted)} .monaco-diff-editor`, { timeout: 20_000 });
+  await expect(page.locator(`${cardSel(EDITABLE.deleted)} .monaco-diff-editor`)).toBeVisible();
+  await expect(page.locator(`${cardSel(EDITABLE.deleted)} .card-actions button:has-text("Save")`)).toHaveCount(0);
 });

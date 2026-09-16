@@ -98,13 +98,18 @@ func TestAPIEditFlow(t *testing.T) {
 	assert.Equal(t, "just one line\n", got)
 }
 
-func TestAPIReadOnlyRejectsEdit(t *testing.T) {
+func TestAPIReadOnlyServesContentButRejectsWrite(t *testing.T) {
 	dir := newTestRepo(t)
 	h := newTestServer(t, dir, []string{"--cached"}).Handler()
 
-	rec, _ := doJSON(t, h, "GET", "/api/file?path=c.txt", nil)
-	assert.Equal(t, 403, rec.Code, "read-only file read should be forbidden")
+	// GET now serves both sides so read-only diffs render in Monaco too.
+	rec, out := doJSON(t, h, "GET", "/api/file?path=c.txt", nil)
+	require.Equalf(t, 200, rec.Code, "read-only file read should serve content: %v", out)
+	assert.Equal(t, "brand new\n", out["content"], "staged content is the target side")
+	assert.Equal(t, "", out["base"], "c.txt is not in HEAD, so base is empty")
+	assert.Equal(t, false, out["editable"], "a --cached diff is read-only")
 
+	// Writes stay forbidden on a read-only diff.
 	rec, _ = doJSON(t, h, "POST", "/api/file", map[string]string{"path": "c.txt", "content": "x"})
 	assert.Equal(t, 403, rec.Code, "read-only file write should be forbidden")
 }
