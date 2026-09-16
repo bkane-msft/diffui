@@ -52,8 +52,12 @@ Options: `-p/--port <n>`, `--host <h>`, `--no-open`, `--staged` (`--cached`), `-
 ## In the browser
 
 - **Sidebar**: file list with status + `+/-` counts; click to jump to a file.
-- **Edit** button (editable views): opens the full working file in an editor.
-  `⌘S` / `Ctrl+S` saves to disk and re-diffs. Tab inserts a tab.
+- **Inline editing** (editable views): syntax-highlighted Monaco diffs load as
+  cards approach the viewport, without an Edit button. Small diffs show at full
+  height; large unchanged gaps collapse with clickable expanders. Cards taller
+  than 600px have an **Expand / Collapse** toggle.
+  **Save** enables when you edit; `⌘S` / `Ctrl+S` saves to disk and re-diffs.
+  Deleted files and read-only comparisons use textual diff tables.
 - **Compare…**: diff any two revisions (or one commit vs your working tree).
 - **History**: reopen any past diff for this repo.
 
@@ -102,5 +106,4 @@ public/          vanilla-JS single-page UI (embedded into the binary)
 
 - Untracked files aren't shown (matches `git diff`); stage or add them to see them.
 - Unified diff view only (no split view yet).
-- No syntax highlighting in the editor (plain monospace).
 - Binary files are listed but not rendered.

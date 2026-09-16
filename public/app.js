@@ -121,9 +121,19 @@ function renderDiffTable(text) {
 // ---- app state -----------------------------------------------------------
 const App = {
   session: null,
+  _editors: [],
+  _observer: null,
 };
 
+function disposeEditors() {
+  App._observer?.disconnect();
+  App._observer = null;
+  for (const editor of App._editors) editor.dispose();
+  App._editors = [];
+}
+
 async function loadSession() {
+  disposeEditors();
   const content = document.getElementById('content');
   content.innerHTML = '';
   content.appendChild(h('div', { class: 'empty' }, 'Loading diff\u2026'));
@@ -138,6 +148,7 @@ async function loadSession() {
 }
 
 function render() {
+  disposeEditors();
   const s = App.session;
   document.getElementById('diffLabel').textContent = s.label.text + (s.editable ? '  \u270e editable' : '  \u25cf read-only');
 
@@ -193,16 +204,15 @@ function scrollToFile(p) {
 }
 
 function renderFileCard(f) {
-  const s = App.session;
-  const canEdit = s.editable && !f.binary && f.status !== 'D';
   const body = h('div', { class: 'filecard-body' }, [h('div', { class: 'empty' }, 'Loading\u2026')]);
+  const actions = h('span', { class: 'card-actions' });
 
   const head = h('div', { class: 'filecard-head' }, [
     h('span', { class: 'status-badge st-' + (STATUS_LABEL[f.status] || 'M') }, STATUS_LABEL[f.status] || 'M'),
     h('span', { class: 'path', title: f.path }, f.oldPath ? f.oldPath + ' \u2192 ' + f.path : f.path),
     h('span', { class: 'grow' }),
-    h('span', { class: 'counts', html: '<span class="add" style="color:var(--add-text)">+' + f.additions + '</span> <span class="del" style="color:var(--del-text)">\u2212' + f.deletions + '</span>' }),
-    canEdit ? h('button', { class: 'btn small', onclick: () => enterEdit(f, body, head) }, 'Edit') : null,
+    h('span', { class: 'counts', html: countsHTML(f) }),
+    actions,
   ]);
 
   const card = h('div', { class: 'filecard', id: fileCardId(f.path) }, [head, body]);
@@ -213,25 +223,57 @@ function renderFileCard(f) {
     return card;
   }
 
-  // lazy-load the diff
-  api('/api/diff?path=' + encodeURIComponent(f.path))
-    .then((d) => {
-      body.innerHTML = '';
-      body.appendChild(renderDiffTable(d.diff));
-    })
-    .catch((e) => {
-      body.innerHTML = '';
-      body.appendChild(h('div', { class: 'banner' }, e.message));
-    });
+  if (!App.session.editable || f.status === 'D') {
+    htmlDiffFallback(f, body);
+    return card;
+  }
 
+  observeForMount(f, body, head, actions);
   return card;
 }
 
 // ---- Monaco inline editor -----------------------------------------------
+const COLLAPSE_PX = 600;
+
+function diffOpts(readOnly) {
+  return {
+    renderSideBySide: false,
+    automaticLayout: false,
+    readOnly, domReadOnly: readOnly,
+    originalEditable: false,
+    scrollBeyondLastLine: false,
+    hideUnchangedRegions: { enabled: true, contextLineCount: 3, minimumLineCount: 6, revealLineCount: 20 },
+    minimap: { enabled: false },
+    renderOverviewRuler: false,
+    overviewRulerLanes: 0,
+    lineNumbersMinChars: 4,
+    fontSize: 12.5,
+    scrollbar: { vertical: 'hidden', alwaysConsumeMouseWheel: false },
+  };
+}
+
+function observeForMount(f, body, head, actions) {
+  body._mount = () => mountDiffEditor(f, body, head, actions);
+  if (typeof IntersectionObserver === 'undefined') {
+    body._mount();
+    return;
+  }
+  if (!App._observer) {
+    App._observer = new IntersectionObserver((entries, observer) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        observer.unobserve(entry.target);
+        if (entry.target.isConnected) entry.target._mount();
+      }
+    }, { root: null, rootMargin: '400px 0px' });
+  }
+  App._observer.observe(body);
+}
+
 let _monacoPromise = null;
 
 // loadMonaco lazily injects the vendored, embedded Monaco (public/vs) the first
-// time the user edits a file, so plain diff viewing stays Monaco-free and fast.
+// time an editable file approaches the viewport.
 function loadMonaco() {
   if (_monacoPromise) return _monacoPromise;
   _monacoPromise = new Promise((resolve, reject) => {
@@ -310,10 +352,9 @@ function updateCounts(head, f) {
     '<span class="del" style="color:var(--del-text)">\u2212' + delT + '</span>';
 }
 
-async function enterEdit(f, body, head) {
-  body.innerHTML = '';
-  body.appendChild(h('div', { class: 'empty' }, 'Loading editor\u2026'));
-
+async function mountDiffEditor(f, body, head, actions) {
+  const editors = App._editors;
+  const editable = !!App.session.editable;
   let data;
   let monaco;
   try {
@@ -322,87 +363,114 @@ async function enterEdit(f, body, head) {
       loadMonaco(),
     ]);
   } catch (e) {
-    body.innerHTML = '';
-    body.appendChild(h('div', { class: 'banner' }, 'Editor failed to load: ' + e.message));
+    if (editors !== App._editors) return;
+    toast('Editor failed to load: ' + e.message);
+    htmlDiffFallback(f, body);
     return;
   }
+  // A diff switch may have removed this card while its assets were loading.
+  if (editors !== App._editors) return;
 
-  const container = h('div', { class: 'monaco-host' });
-  const saveBtn = h('button', { class: 'btn small primary' }, 'Save');
-  const doneBtn = h('button', { class: 'btn small' }, 'Done');
-  const bar = h('div', { class: 'editor-bar' }, [
-    h('span', { class: 'hint' }, 'Editing working file inline \u2014 changes re-diff live; \u2318S / Ctrl+S saves to disk.'),
-    doneBtn,
-    saveBtn,
-  ]);
-  body.innerHTML = '';
-  body.appendChild(h('div', { class: 'editor-wrap' }, [container, bar]));
+  const host = h('div', { class: 'monaco-host' });
+  const bar = h('div', { class: 'expand-bar', hidden: '' });
+  const wrap = h('div', { class: 'monaco-wrap' }, [host, bar]);
+  body.replaceChildren(wrap);
 
   const lang = langForPath(monaco, f.path);
   const original = monaco.editor.createModel(data.base || '', lang);
   const modified = monaco.editor.createModel(data.content || '', lang);
-  const diffEditor = monaco.editor.createDiffEditor(container, {
-    renderSideBySide: false, // single inline column (whole-file, diff-highlighted)
-    automaticLayout: false,
-    readOnly: false,
-    originalEditable: false,
-    scrollBeyondLastLine: false,
-    hideUnchangedRegions: { enabled: false }, // show the whole file, GitHub-style
-    minimap: { enabled: false },
-    renderOverviewRuler: false,
-    overviewRulerLanes: 0,
-    lineNumbersMinChars: 4,
-    fontSize: 12.5,
-    // Let the page own vertical scrolling so all files scroll as one document.
-    scrollbar: { vertical: 'hidden', alwaysConsumeMouseWheel: false },
-  });
+  const diffEditor = monaco.editor.createDiffEditor(host, diffOpts(!editable));
   diffEditor.setModel({ original, modified });
 
   const modEd = diffEditor.getModifiedEditor();
+  let expanded = false;
+  let capped = false;
+  let disposed = false;
+  const toggle = h('button', { class: 'btn small', onclick: () => {
+    expanded = !expanded;
+    fit();
+  } });
+  bar.appendChild(toggle);
+  const renderBar = () => {
+    bar.hidden = !capped;
+    wrap.classList.toggle('collapsed', capped && !expanded);
+    toggle.textContent = expanded ? 'Collapse \u25b4' : 'Expand \u25be';
+  };
   const fit = () => {
-    const hgt = Math.max(modEd.getContentHeight(), 30);
-    container.style.height = hgt + 'px';
-    diffEditor.layout({ width: container.clientWidth, height: hgt });
+    if (disposed) return;
+    const full = Math.max(modEd.getContentHeight(), 30);
+    capped = full > COLLAPSE_PX;
+    const hgt = capped && !expanded ? COLLAPSE_PX : full;
+    host.style.height = hgt + 'px';
+    diffEditor.layout({ width: host.clientWidth, height: hgt });
+    renderBar();
   };
   const sizeSub = modEd.onDidContentSizeChange(fit);
   const diffSub = diffEditor.onDidUpdateDiff(fit);
-  requestAnimationFrame(fit);
+  const frame = requestAnimationFrame(fit);
+  window.addEventListener('resize', fit);
 
-  const save = async () => {
-    try {
-      const res = await api('/api/file', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: f.path, content: modEd.getValue() }),
-      });
-      f.additions = res.additions;
-      f.deletions = res.deletions;
-      updateCounts(head, f);
-      toast('Saved ' + f.path);
-    } catch (e) {
-      toast('Save failed: ' + e.message);
-    }
-  };
-  modEd.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, save);
-  saveBtn.addEventListener('click', save);
-
-  body._cleanup = () => {
-    sizeSub.dispose();
-    diffSub.dispose();
-    diffEditor.dispose();
-    original.dispose();
-    modified.dispose();
-    body._cleanup = null;
-  };
-  doneBtn.addEventListener('click', () => {
-    body._cleanup();
-    reloadCard(f, body);
+  let changeSub;
+  let saveAction;
+  if (editable) {
+    const saveBtn = h('button', { class: 'btn small primary', disabled: '' }, 'Save');
+    actions.appendChild(saveBtn);
+    let savedContent = modified.getValue();
+    let saving = false;
+    const updateSave = () => {
+      saveBtn.disabled = saving || modified.getValue() === savedContent;
+    };
+    changeSub = modEd.onDidChangeModelContent(updateSave);
+    const save = async () => {
+      if (disposed || saveBtn.disabled) return;
+      const content = modEd.getValue();
+      saving = true;
+      updateSave();
+      try {
+        const res = await api('/api/file', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ path: f.path, content }),
+        });
+        if (disposed) return;
+        f.additions = res.additions;
+        f.deletions = res.deletions;
+        updateCounts(head, f);
+        savedContent = content;
+        toast('Saved ' + f.path);
+      } catch (e) {
+        toast('Save failed: ' + e.message);
+      } finally {
+        saving = false;
+        if (!disposed) updateSave();
+      }
+    };
+    // addAction scopes its keybinding to this editor and can be disposed.
+    saveAction = modEd.addAction({
+      id: 'save-working-file',
+      label: 'Save working file',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
+      run: save,
+    });
+    saveBtn.addEventListener('click', save);
+  }
+  editors.push({
+    dispose() {
+      disposed = true;
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', fit);
+      sizeSub.dispose();
+      diffSub.dispose();
+      changeSub?.dispose();
+      saveAction?.dispose();
+      diffEditor.dispose();
+      original.dispose();
+      modified.dispose();
+    },
   });
-
-  modEd.focus();
 }
 
-function reloadCard(f, body) {
+function htmlDiffFallback(f, body) {
   body.innerHTML = '';
   body.appendChild(h('div', { class: 'empty' }, 'Loading\u2026'));
   api('/api/diff?path=' + encodeURIComponent(f.path))
