@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>git diffui</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">git <span>diffui</span></div>
+      <div class="diff-label" id="diffLabel">loading…</div>
+      <div class="spacer"></div>
+      <button class="btn" id="compareBtn" title="Diff two revisions">Compare…</button>
+      <button class="btn" id="historyBtn" title="Past diffs in this repo">History</button>
+      <button class="btn" id="refreshBtn" title="Re-run git diff">Refresh</button>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-head">
+          <span id="fileCount">0 files</span>
+          <span id="totals" class="totals"></span>
+        </div>
+        <ul class="filelist" id="filelist"></ul>
+      </aside>
+      <main class="content" id="content"></main>
+    </div>
+
+    <div class="modal-backdrop" id="modalBackdrop" hidden>
+      <div class="modal" id="modal"></div>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
