@@ -52,38 +52,41 @@ Options: `-p/--port <n>`, `--host <h>`, `--no-open`, `--staged` (`--cached`), `-
 ## Shell completion
 
 Make `git diffui <TAB>` complete branches, tags, and commits (including
-`a..b` ranges) plus the flags above — just like `git diff <TAB>`. The scripts
-live in [`completions/`](completions/) and reuse git's own ref-completion
-helpers, so git's completion must be loaded first (it usually is).
+`a..b` ranges) plus the flags above — just like `git diff <TAB>`. The
+completion scripts are **embedded in the binary** and reuse git's own
+ref-completion helpers, so git's completion must be loaded first (it usually
+is).
 
-Quick install:
-
-```bash
-make install-completions   # installs the zsh file, prints the bash source line
-```
-
-This installs the zsh completion onto `~/.zsh/completions` (override with
-`ZSH_COMPLETIONS_DIR=…`) and prints the one-line bash setup. It does not edit
-your shell rc files — add the lines it prints yourself. The manual steps are:
+The easiest way is the built-in `completion` subcommand, which prints the
+script for your shell to stdout:
 
 **bash** — source it from `~/.bashrc`, after git's completion:
 
 ```bash
-source /path/to/diffui/completions/git-diffui.bash
+source <(git diffui completion bash)
 ```
 
-**zsh** — install it on your `$fpath` as `_git-diffui`, then run `compinit`:
+**zsh** — save it on your `$fpath` as `_git-diffui`, then run `compinit`:
 
 ```zsh
 mkdir -p ~/.zsh/completions
-cp /path/to/diffui/completions/git-diffui.zsh ~/.zsh/completions/_git-diffui
+git diffui completion zsh > ~/.zsh/completions/_git-diffui
 # in ~/.zshrc, before compinit:
 fpath=(~/.zsh/completions $fpath)
 autoload -Uz compinit && compinit
 ```
 
-Both cover the `git diffui` subcommand form and the standalone `git-diffui`
-binary. See the header comment in each file for details.
+If you'd rather not edit your rc files by hand, `make install-completions`
+saves the zsh completion onto `~/.zsh/completions` (override with
+`ZSH_COMPLETIONS_DIR=…`) and prints the bash setup line for you.
+
+The raw scripts also live in [`completions/`](completions/) if you want to
+source them directly. Both cover the `git diffui` subcommand form and the
+standalone `git-diffui` binary; see the header comment in each file for
+details.
+
+> Packaging with Homebrew? The `completion` subcommand plugs straight into
+> `generate_completions_from_executable(bin/"git-diffui", "completion")`.
 
 ## In the browser
 

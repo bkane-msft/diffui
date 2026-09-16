@@ -17,6 +17,9 @@ import (
 //go:embed public
 var embedded embed.FS
 
+//go:embed completions/git-diffui.bash completions/git-diffui.zsh
+var completionScripts embed.FS
+
 const helpText = `git diffui — GitHub-style web UI for git diffs, with editable working-tree files.
 
 USAGE
@@ -42,6 +45,15 @@ OPTIONS
 HISTORY
   Every launch is recorded per-repo (in <git-dir>/diffui/history.json). Open the
   History panel in the UI to revisit past diffs.
+
+SHELL COMPLETION
+  git diffui completion bash    Print the bash completion script to stdout
+  git diffui completion zsh     Print the zsh completion script to stdout
+
+  bash:  add to ~/.bashrc (after git's completion is loaded):
+             source <(git diffui completion bash)
+  zsh:   save onto a directory in your $fpath, then run compinit:
+             git diffui completion zsh > ~/.zsh/completions/_git-diffui
 `
 
 type options struct {
@@ -105,6 +117,51 @@ func parseArgs(argv []string) (options, error) {
 	return opts, nil
 }
 
+const completionHelpText = `git diffui completion — print a shell completion script.
+
+USAGE
+  git diffui completion bash    Print the bash completion script to stdout
+  git diffui completion zsh     Print the zsh completion script to stdout
+
+  bash:  source <(git diffui completion bash)          # e.g. in ~/.bashrc
+  zsh:   git diffui completion zsh > ~/.zsh/completions/_git-diffui
+
+Both reuse git's own ref-completion helpers, so git's completion must be
+loaded first (it usually is). See the scripts' header comments for details.
+`
+
+// runCompletion implements the `git diffui completion <shell>` subcommand. It
+// writes the embedded completion script for the requested shell to stdout so it
+// can be sourced (bash) or saved onto $fpath (zsh). A leading path is tolerated
+// so `git diffui completion "$SHELL"` (e.g. /bin/zsh) works.
+func runCompletion(args []string) int {
+	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" {
+		fmt.Print(completionHelpText)
+		if len(args) == 0 {
+			return 2
+		}
+		return 0
+	}
+	name := strings.ToLower(filepath.Base(strings.TrimSpace(args[0])))
+	var file string
+	switch {
+	case strings.Contains(name, "bash"):
+		file = "completions/git-diffui.bash"
+	case strings.Contains(name, "zsh"):
+		file = "completions/git-diffui.zsh"
+	default:
+		fmt.Fprintf(os.Stderr, "git diffui completion: unsupported shell %q (supported: bash, zsh)\n", args[0])
+		return 2
+	}
+	data, err := completionScripts.ReadFile(file)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	os.Stdout.Write(data)
+	return 0
+}
+
 func openBrowser(url string) {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
@@ -135,6 +192,9 @@ func listenAuto(host string, port, attempts int) (net.Listener, int, error) {
 }
 
 func run(argv []string) int {
+	if len(argv) > 0 && argv[0] == "completion" {
+		return runCompletion(argv[1:])
+	}
 	opts, err := parseArgs(argv)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

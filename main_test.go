@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -61,4 +63,48 @@ func TestHistoryRecordDedup(t *testing.T) {
 	for _, e := range entries {
 		assert.NotEqual(t, "1", e.ID, "duplicate spec entry should be removed")
 	}
+}
+
+// captureStdout runs fn with os.Stdout redirected to a pipe and returns what
+// it wrote.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	orig := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+	defer func() { os.Stdout = orig }()
+
+	fn()
+	require.NoError(t, w.Close())
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(out)
+}
+
+func TestRunCompletion(t *testing.T) {
+	cases := []struct {
+		name     string
+		args     []string
+		wantCode int
+		contains string
+	}{
+		{"bash", []string{"bash"}, 0, "_git_diffui"},
+		{"zsh", []string{"zsh"}, 0, "#compdef git-diffui"},
+		{"shell path is tolerated", []string{"/bin/zsh"}, 0, "#compdef git-diffui"},
+		{"help", []string{"--help"}, 0, "git diffui completion"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var code int
+			out := captureStdout(t, func() { code = runCompletion(c.args) })
+			assert.Equal(t, c.wantCode, code)
+			assert.Contains(t, out, c.contains)
+		})
+	}
+}
+
+func TestRunCompletionErrors(t *testing.T) {
+	assert.Equal(t, 2, runCompletion(nil), "no shell arg is a usage error")
+	assert.Equal(t, 2, runCompletion([]string{"fish"}), "unsupported shell")
 }

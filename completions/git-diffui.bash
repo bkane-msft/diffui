@@ -7,10 +7,14 @@
 # It reuses git's own ref-completion helpers, so git's bash completion
 # (git-completion.bash) must be loaded first. Most git installs load it
 # automatically; on macOS with Homebrew it's typically
-# `/opt/homebrew/etc/bash_completion.d/git-completion.bash`. Then add to your
-# ~/.bashrc, AFTER git's completion is sourced:
+# `/opt/homebrew/etc/bash_completion.d/git-completion.bash`. Then, the easiest
+# install is to source the embedded copy straight from the binary in ~/.bashrc,
+# AFTER git's completion is sourced:
 #
-#     source /path/to/diffui/completions/git-diffui.bash
+#     source <(git diffui completion bash)
+#
+# (Or source this file directly if you prefer:
+#     source /path/to/diffui/completions/git-diffui.bash )
 #
 # git's completion auto-dispatches `git diffui` to the function named
 # `_git_diffui` (subcommand dashes become underscores), so defining it is all

@@ -7,10 +7,14 @@
 # `git diff <TAB>`, by reusing zsh's git completion helpers.
 #
 # Install: place this file, named `_git-diffui`, in a directory on your $fpath,
-# then run compinit. For example:
+# then run compinit. The easiest way is to write it straight from the binary,
+# which embeds this script:
 #
 #     mkdir -p ~/.zsh/completions
-#     cp /path/to/diffui/completions/git-diffui.zsh ~/.zsh/completions/_git-diffui
+#     git diffui completion zsh > ~/.zsh/completions/_git-diffui
+#
+# (Or copy this file directly:
+#     cp /path/to/diffui/completions/git-diffui.zsh ~/.zsh/completions/_git-diffui )
 #
 # and in ~/.zshrc, BEFORE `compinit`:
 #
