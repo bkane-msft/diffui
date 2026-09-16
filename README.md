@@ -56,6 +56,16 @@ Make `git diffui <TAB>` complete branches, tags, and commits (including
 live in [`completions/`](completions/) and reuse git's own ref-completion
 helpers, so git's completion must be loaded first (it usually is).
 
+Quick install:
+
+```bash
+make install-completions   # installs the zsh file, prints the bash source line
+```
+
+This installs the zsh completion onto `~/.zsh/completions` (override with
+`ZSH_COMPLETIONS_DIR=…`) and prints the one-line bash setup. It does not edit
+your shell rc files — add the lines it prints yourself. The manual steps are:
+
 **bash** — source it from `~/.bashrc`, after git's completion:
 
 ```bash
