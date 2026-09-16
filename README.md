@@ -66,15 +66,20 @@ script for your shell to stdout:
 source <(git diffui completion bash)
 ```
 
-**zsh** — save it on your `$fpath` as `_git-diffui`, then run `compinit`:
+**zsh** — save it on your `$fpath` as `_git_diffui`, then run `compinit`:
 
 ```zsh
 mkdir -p ~/.zsh/completions
-git diffui completion zsh > ~/.zsh/completions/_git-diffui
+git diffui completion zsh > ~/.zsh/completions/_git_diffui
 # in ~/.zshrc, before compinit:
 fpath=(~/.zsh/completions $fpath)
 autoload -Uz compinit && compinit
 ```
+
+The filename **`_git_diffui`** (underscores, no dash) matters: git's own zsh
+completion dispatches the `git diffui` subcommand to a function named
+`_git_diffui`, so a file named `_git-diffui` would be silently ignored and
+`git diffui <TAB>` would fall back to filenames.
 
 If you'd rather not edit your rc files by hand, `make install-completions`
 saves the zsh completion onto `~/.zsh/completions` (override with
