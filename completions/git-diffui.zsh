@@ -29,12 +29,25 @@
 #     fpath=(~/.zsh/completions $fpath)
 #     autoload -Uz compinit && compinit
 
+# Force zsh emulation for our own code. This matters because git's zsh wrapper
+# (_git) dispatches `git diffui` by calling this function via `emulate ksh -c
+# _git_diffui`. Without resetting emulation here, our zsh-native completion code
+# ((( $+functions[...] )), _arguments, _describe) runs under ksh emulation and
+# breaks with errors like "bad output format specification" and "bad math
+# expression". `emulate -L zsh` restores proper zsh behavior for this function
+# and is automatically undone on return.
+emulate -L zsh
+
 # Prefer git's own diff completion for perfect fidelity (refs, ranges, paths,
 # and diff flags). git's completion defines `_git_diff` (bash-bridge wrapper,
 # the common macOS/Homebrew case) or `_git-diff` (zsh-native git completion);
 # whichever is loaded, reuse it and we're done.
+#
+# `_git_diff` is git's bash function bridged into zsh; it expects to run under
+# ksh emulation (that's how the _git wrapper normally invokes it), so call it
+# via `emulate ksh -c`. `_git-diff` is native zsh and runs under zsh emulation.
 if (( $+functions[_git_diff] )); then
-  _git_diff
+  emulate ksh -c '_git_diff'
   return
 fi
 if (( $+functions[_git-diff] )); then

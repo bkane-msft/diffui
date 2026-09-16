@@ -69,10 +69,8 @@ source <(git diffui completion bash)
 **zsh** — save it on your `$fpath` as `_git_diffui`, then run `compinit`:
 
 ```zsh
-mkdir -p ~/.zsh/completions
-git diffui completion zsh > ~/.zsh/completions/_git_diffui
-# in ~/.zshrc, before compinit:
-fpath=(~/.zsh/completions $fpath)
+# ~/fbin here is any directory on your $fpath (check: print -l $fpath)
+git diffui completion zsh > ~/fbin/_git_diffui
 autoload -Uz compinit && compinit
 ```
 
@@ -82,11 +80,10 @@ completion dispatches the `git diffui` subcommand to a function named
 `git diffui <TAB>` would fall back to filenames.
 
 If you'd rather not edit your rc files by hand, `make install-completions`
-saves the zsh completion onto `~/.zsh/completions` (override with
+saves the zsh completion onto `~/fbin` (override with
 `ZSH_COMPLETIONS_DIR=…`) and prints the bash setup line for you. Point
 `ZSH_COMPLETIONS_DIR` at a directory that's already on your `$fpath` (check
-with `print -l $fpath`), otherwise zsh won't pick the file up — the default
-`~/.zsh/completions` only works if you've added it to `$fpath` as shown above.
+with `print -l $fpath`), otherwise zsh won't pick the file up.
 
 The raw scripts also live in [`completions/`](completions/) if you want to
 source them directly. Both cover the `git diffui` subcommand form and the

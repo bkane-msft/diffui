@@ -53,7 +53,7 @@ SHELL COMPLETION
   bash:  add to ~/.bashrc (after git's completion is loaded):
              source <(git diffui completion bash)
   zsh:   save onto a directory in your $fpath, then run compinit:
-             git diffui completion zsh > ~/.zsh/completions/_git_diffui
+             git diffui completion zsh > ~/fbin/_git_diffui
 `
 
 type options struct {
@@ -124,7 +124,7 @@ USAGE
   git diffui completion zsh     Print the zsh completion script to stdout
 
   bash:  source <(git diffui completion bash)          # e.g. in ~/.bashrc
-  zsh:   git diffui completion zsh > ~/.zsh/completions/_git_diffui
+  zsh:   git diffui completion zsh > ~/fbin/_git_diffui
 
 Both reuse git's own ref-completion helpers, so git's completion must be
 loaded first (it usually is). See the scripts' header comments for details.

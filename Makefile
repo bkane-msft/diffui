@@ -1,7 +1,9 @@
 BINARY := git-diffui
 PREFIX ?= $(HOME)/.local/bin
 # Directory (on your zsh $fpath) to install the zsh completion into.
-ZSH_COMPLETIONS_DIR ?= $(HOME)/.zsh/completions
+# ~/fbin is a common personal bin dir that's often already on $fpath; override
+# with `make install-completions ZSH_COMPLETIONS_DIR=...` if yours differs.
+ZSH_COMPLETIONS_DIR ?= $(HOME)/fbin
 
 .PHONY: build test cover vet run install install-local install-completions clean vendor-monaco test-e2e
 
