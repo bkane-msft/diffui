@@ -124,7 +124,15 @@ function renderFileCard(f) {
   const body = h('div', { class: 'filecard-body' }, [h('div', { class: 'empty' }, 'Loading\u2026')]);
   const actions = h('span', { class: 'card-actions' });
 
+  const toggle = h('button', {
+    class: 'card-toggle',
+    type: 'button',
+    title: 'Collapse file',
+    'aria-expanded': 'true',
+  }, '\u25be');
+
   const head = h('div', { class: 'filecard-head' }, [
+    toggle,
     h('span', { class: 'status-badge st-' + (STATUS_LABEL[f.status] || 'M') }, STATUS_LABEL[f.status] || 'M'),
     h('span', { class: 'path', title: f.path }, f.oldPath ? f.oldPath + ' \u2192 ' + f.path : f.path),
     h('span', { class: 'grow' }),
@@ -133,6 +141,13 @@ function renderFileCard(f) {
   ]);
 
   const card = h('div', { class: 'filecard', id: fileCardId(f.path) }, [head, body]);
+
+  toggle.addEventListener('click', () => {
+    const collapsed = card.classList.toggle('collapsed');
+    toggle.textContent = collapsed ? '\u25b8' : '\u25be';
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.title = collapsed ? 'Expand file' : 'Collapse file';
+  });
 
   if (f.binary) {
     body.innerHTML = '';

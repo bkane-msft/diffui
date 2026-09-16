@@ -101,9 +101,10 @@ html, body {
 .layout { display: flex; height: calc(100vh - 53px); }
 
 .sidebar {
+  order: 2;
   width: 300px;
   min-width: 300px;
-  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   overflow: auto;
   background: var(--bg);
 }
@@ -159,7 +160,7 @@ html, body {
 .counts .del { color: var(--del-text); }
 .totals { font-family: var(--mono); }
 
-.content { flex: 1; overflow: auto; padding: 16px; }
+.content { order: 1; flex: 1; overflow: auto; padding: 16px; }
 
 .filecard {
   border: 1px solid var(--border);
@@ -189,6 +190,27 @@ html, body {
 }
 .filecard-head .grow { flex: 1; }
 .filecard-head .counts { font-size: 12px; }
+
+.card-toggle {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.card-toggle:hover { background: var(--bg); border-color: var(--border); color: var(--text); }
+.filecard.collapsed .filecard-body { display: none; }
+.filecard.collapsed { overflow: hidden; }
+.filecard.collapsed .filecard-head { border-bottom: none; }
 
 .diff-table {
   width: 100%;

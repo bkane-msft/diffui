@@ -52,10 +52,13 @@ Options: `-p/--port <n>`, `--host <h>`, `--no-open`, `--staged` (`--cached`), `-
 ## In the browser
 
 - **Sidebar**: file list with status + `+/-` counts; click to jump to a file.
+  Shown on the right-hand side of the layout.
 - **Diffs render in Monaco** for every view — syntax-highlighted, consistent UI.
   Editors mount lazily as cards approach the viewport, without an Edit button.
   Small diffs show at full height; large unchanged gaps collapse with clickable
   expanders. Cards taller than 600px have an **Expand / Collapse** toggle.
+- **Collapse a file**: the caret in each file card's header collapses/expands
+  that card's body so you can skip past large files without scrolling.
 - **Inline editing** (editable views only): **Save** enables when you edit;
   `⌘S` / `Ctrl+S` saves to disk and re-diffs. Read-only comparisons (historical,
   `--staged`, ranges) and deleted files render the same Monaco diff but read-only
@@ -100,6 +103,7 @@ Coverage:
   button), with live syntax highlighting.
 - Small files render uncapped; a tall single change is capped at ~600px with a
   working Expand/Collapse toggle.
+- The per-card header caret collapses and restores a file's body.
 - Large multi-hunk files hide unchanged regions and expand on demand.
 - Editing enables Save; both the Save button and the ⌘/Ctrl+S keybinding persist
   to disk and update the add/delete counts, and the keybinding is scoped

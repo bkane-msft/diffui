@@ -95,6 +95,29 @@ test('small file is not collapsed and shows no Expand button', async ({ page }) 
   expect(await hostHeight(page, EDITABLE.small)).toBeLessThan(600);
 });
 
+test('card header collapse toggle hides and restores the file body', async ({ page }) => {
+  await page.goto(server.baseURL);
+  await page.waitForSelector('.filecard');
+  await mountCard(page, EDITABLE.small);
+
+  const card = page.locator(cardSel(EDITABLE.small));
+  const body = page.locator(`${cardSel(EDITABLE.small)} .filecard-body`);
+  const toggle = page.locator(`${cardSel(EDITABLE.small)} .card-toggle`);
+
+  await expect(body).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+  await toggle.click();
+  await expect(card).toHaveClass(/collapsed/);
+  await expect(body).toBeHidden();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+  await toggle.click();
+  await expect(card).not.toHaveClass(/collapsed/);
+  await expect(body).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+});
+
 test('large multi-hunk file shows hidden unchanged regions that expand to reveal more', async ({ page }) => {
   await page.goto(server.baseURL);
   await page.waitForSelector('.filecard');
