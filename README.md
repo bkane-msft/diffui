@@ -75,6 +75,38 @@ API end-to-end via `httptest` (session, diff, edit-to-disk, read-only guards,
 switch/compare, history, embedded static serving). Tests that need `git` skip
 automatically if it isn't installed.
 
+### Frontend tests
+
+The inline-Monaco UI has a hermetic browser (E2E) suite driven by
+[Playwright](https://playwright.dev/) (bundled Chromium), living in
+`test/e2e/`. Each run spins up a temporary git repo with fixtures, launches the
+built `git-diffui` binary headlessly, and drives the real UI.
+
+```bash
+npx playwright install chromium   # one-time: download the browser (~150 MB)
+make test-e2e                     # build the binary + run the Playwright suite
+```
+
+`make test-e2e` is intentionally **not** part of `make test` / `go test`, so
+contributors without the Playwright browser aren't blocked. It installs npm
+dependencies on first run and requires the one-time `playwright install`
+above (network access needed once).
+
+Coverage:
+
+- Editable non-binary cards auto-mount an inline Monaco diff editor (no "Edit"
+  button), with live syntax highlighting.
+- Small files render uncapped; a tall single change is capped at ~600px with a
+  working Expand/Collapse toggle.
+- Large multi-hunk files hide unchanged regions and expand on demand.
+- Editing enables Save; both the Save button and the ⌘/Ctrl+S keybinding persist
+  to disk and update the add/delete counts, and the keybinding is scoped
+  per-card (saving one editor never touches another).
+- Re-rendering disposes editors with no leaked Monaco models.
+- Binary files show the binary banner, deleted files fall back to a textual diff
+  table, and read-only specs (e.g. `--staged`) refuse inline editing — all with
+  no Monaco.
+
 ## Project layout
 
 ```

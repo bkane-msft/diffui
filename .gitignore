@@ -3,3 +3,10 @@
 
 # OS cruft
 .DS_Store
+
+# Frontend (Playwright) E2E tests
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+.last-run.json

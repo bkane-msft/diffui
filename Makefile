@@ -1,7 +1,7 @@
 BINARY := git-diffui
 PREFIX ?= $(HOME)/.local/bin
 
-.PHONY: build test cover vet run install install-local clean vendor-monaco
+.PHONY: build test cover vet run install install-local clean vendor-monaco test-e2e
 
 build:
 	go build -o $(BINARY) .
@@ -33,3 +33,10 @@ clean:
 # Re-vendor the embedded Monaco editor (public/vs). Pass V=<version> to bump.
 vendor-monaco:
 	MONACO_VERSION=$(V) scripts/vendor-monaco.sh
+
+# Frontend browser (E2E) tests: drive the inline-Monaco UI with Playwright.
+# NOT part of `make test` / `go test` so contributors without the Playwright
+# browser aren't broken. Requires a one-time `npx playwright install chromium`.
+test-e2e: build
+	@if [ ! -d node_modules ]; then npm install; fi
+	npx playwright test

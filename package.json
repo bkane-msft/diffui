@@ -1,0 +1,14 @@
+{
+  "name": "git-diffui-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright end-to-end tests for the git-diffui frontend (inline Monaco diff UI).",
+  "scripts": {
+    "test": "playwright test",
+    "test:e2e": "playwright test",
+    "install:browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}
