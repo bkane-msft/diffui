@@ -22,6 +22,14 @@ test.afterAll(async () => {
   rmRepo(repoDir);
 });
 
+// The file list is collapsed by default; these tests navigate by clicking its
+// rows, so open it (and keep it open across this test's navigations) up front.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try { localStorage.setItem('diffui.filebar', 'open'); } catch { /* ignore */ }
+  });
+});
+
 test('read-only diff reports editable=false; GET serves content, POST is refused', async ({ request }) => {
   const session = await (await request.get(server.baseURL + '/api/session')).json();
   expect(session.editable).toBe(false);

@@ -160,7 +160,6 @@ function renderFileCard(f) {
 }
 
 // ---- Monaco inline editor -----------------------------------------------
-const COLLAPSE_PX = 600;
 
 function diffOpts(readOnly) {
   return {
@@ -300,9 +299,7 @@ async function mountDiffEditor(f, body, head, actions) {
   if (editors !== App._editors) return;
 
   const host = h('div', { class: 'monaco-host' });
-  const bar = h('div', { class: 'expand-bar', hidden: '' });
-  const wrap = h('div', { class: 'monaco-wrap' }, [host, bar]);
-  body.replaceChildren(wrap);
+  body.replaceChildren(host);
 
   const lang = langForPath(monaco, f.path);
   const original = monaco.editor.createModel(data.base || '', lang);
@@ -334,27 +331,14 @@ async function mountDiffEditor(f, body, head, actions) {
   host.addEventListener('mousedown', stopDeletedMenu, true);
 
   const modEd = diffEditor.getModifiedEditor();
-  let expanded = false;
-  let capped = false;
   let disposed = false;
-  const toggle = h('button', { class: 'btn small', onclick: () => {
-    expanded = !expanded;
-    fit();
-  } });
-  bar.appendChild(toggle);
-  const renderBar = () => {
-    bar.hidden = !capped;
-    wrap.classList.toggle('collapsed', capped && !expanded);
-    toggle.textContent = expanded ? 'Collapse \u25b4' : 'Expand \u25be';
-  };
+  // Size the host to the editor's full content height so the page (not the
+  // editor) owns vertical scrolling and the entire file is shown inline.
   const fit = () => {
     if (disposed) return;
     const full = Math.max(modEd.getContentHeight(), 30);
-    capped = full > COLLAPSE_PX;
-    const hgt = capped && !expanded ? COLLAPSE_PX : full;
-    host.style.height = hgt + 'px';
-    diffEditor.layout({ width: host.clientWidth, height: hgt });
-    renderBar();
+    host.style.height = full + 'px';
+    diffEditor.layout({ width: host.clientWidth, height: full });
   };
   const sizeSub = modEd.onDidContentSizeChange(fit);
   const diffSub = diffEditor.onDidUpdateDiff(fit);
@@ -506,6 +490,25 @@ async function openHistory() {
 document.getElementById('refreshBtn').addEventListener('click', loadSession);
 document.getElementById('compareBtn').addEventListener('click', openCompare);
 document.getElementById('historyBtn').addEventListener('click', openHistory);
+
+// Sidebar (file list) collapse. Collapsed by default; the choice persists.
+const FILEBAR_KEY = 'diffui.filebar';
+function applyFilebar(open) {
+  document.getElementById('sidebar').classList.toggle('collapsed', !open);
+  const btn = document.getElementById('filesBtn');
+  btn.classList.toggle('active', open);
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  // Editors size to their container width, which changes when the sidebar
+  // shows/hides; trigger the same relayout path a window resize uses.
+  window.dispatchEvent(new Event('resize'));
+}
+document.getElementById('filesBtn').addEventListener('click', () => {
+  const open = document.getElementById('sidebar').classList.contains('collapsed');
+  localStorage.setItem(FILEBAR_KEY, open ? 'open' : 'closed');
+  applyFilebar(open);
+});
+applyFilebar(localStorage.getItem(FILEBAR_KEY) === 'open');
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeModal();
 });

@@ -91,7 +91,8 @@ function createEditableRepo() {
   write(dir, EDITABLE.large, repeatLines('const v', 420).replace(/;/g, ' = 0;'));
 
   // 3) tall file: a long contiguous block that will be fully rewritten so the
-  //    rendered inline diff exceeds the 600px collapse cap.
+  //    rendered inline diff is tall (hundreds of px); it renders full-height
+  //    inline (no snippet cap).
   write(dir, EDITABLE.tall, repeatLines('const old', 90).replace(/;/g, ' = 0;'));
 
   // 4) small files for the multi-card save-scope test.

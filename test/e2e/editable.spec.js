@@ -23,6 +23,14 @@ test.afterAll(async () => {
   rmRepo(repoDir);
 });
 
+// The file list is collapsed by default; these tests navigate by clicking its
+// rows, so open it (and keep it open across this test's navigations) up front.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try { localStorage.setItem('diffui.filebar', 'open'); } catch { /* ignore */ }
+  });
+});
+
 const cardId = (p) => 'file-' + p.replace(/[^a-zA-Z0-9]/g, '_');
 const cardSel = (p) => '#' + cardId(p);
 
@@ -85,14 +93,20 @@ test('syntax highlighting is active (Monaco token spans) for a code file', async
     .toBeGreaterThan(0);
 });
 
-test('small file is not collapsed and shows no Expand button', async ({ page }) => {
+test('files render full height inline with no snippet Expand/Collapse affordance', async ({ page }) => {
   await page.goto(server.baseURL);
   await page.waitForSelector('.filecard');
-  await mountCard(page, EDITABLE.small);
 
-  await expect(page.locator(`${cardSel(EDITABLE.small)} .monaco-wrap.collapsed`)).toHaveCount(0);
-  await expect(page.locator(`${cardSel(EDITABLE.small)} .expand-bar`)).toBeHidden();
-  expect(await hostHeight(page, EDITABLE.small)).toBeLessThan(600);
+  // Small file: mounts inline with no snippet wrap/expand bar.
+  await mountCard(page, EDITABLE.small);
+  await expect(page.locator(`${cardSel(EDITABLE.small)} .expand-bar`)).toHaveCount(0);
+  await expect(page.locator(`${cardSel(EDITABLE.small)} .monaco-wrap`)).toHaveCount(0);
+
+  // Tall file: shown at full content height (no ~600px cap) with no expand bar,
+  // so the whole file is scrollable inline.
+  await mountCard(page, EDITABLE.tall);
+  await expect(page.locator(`${cardSel(EDITABLE.tall)} .expand-bar`)).toHaveCount(0);
+  expect(await hostHeight(page, EDITABLE.tall)).toBeGreaterThan(640);
 });
 
 test('card header collapse toggle hides and restores the file body', async ({ page }) => {
@@ -130,29 +144,6 @@ test('large multi-hunk file shows hidden unchanged regions that expand to reveal
   // The unchanged-region widget's expander is an icon anchor.
   await page.locator(`${cardSel(EDITABLE.large)} .diff-hidden-lines a`).first().click();
   await expect.poll(async () => hostHeight(page, EDITABLE.large)).toBeGreaterThan(before);
-});
-
-test('tall single-change file is capped at ~600px with a working Expand/Collapse toggle', async ({ page }) => {
-  await page.goto(server.baseURL);
-  await page.waitForSelector('.filecard');
-  await mountCard(page, EDITABLE.tall);
-
-  const wrap = page.locator(`${cardSel(EDITABLE.tall)} .monaco-wrap`);
-  await expect(wrap).toHaveClass(/collapsed/);
-  const capped = await hostHeight(page, EDITABLE.tall);
-  expect(capped).toBeLessThanOrEqual(640);
-  expect(capped).toBeGreaterThan(400);
-
-  const toggle = page.locator(`${cardSel(EDITABLE.tall)} .expand-bar button`);
-  await expect(toggle).toBeVisible();
-
-  await toggle.click(); // Expand
-  await expect(wrap).not.toHaveClass(/collapsed/);
-  await expect.poll(async () => hostHeight(page, EDITABLE.tall)).toBeGreaterThan(capped);
-
-  await toggle.click(); // Collapse restores the cap
-  await expect(wrap).toHaveClass(/collapsed/);
-  await expect.poll(async () => hostHeight(page, EDITABLE.tall)).toBeLessThanOrEqual(640);
 });
 
 test('editing enables Save; both click and keyboard persist to disk and update counts', async ({ page }) => {

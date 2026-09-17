@@ -96,11 +96,12 @@ details.
 ## In the browser
 
 - **Sidebar**: file list with status + `+/-` counts; click to jump to a file.
-  Shown on the right-hand side of the layout.
+  Shown on the right-hand side of the layout, collapsed by default — toggle it
+  with the **Files** button in the top bar (your choice is remembered).
 - **Diffs render in Monaco** for every view — syntax-highlighted, consistent UI.
   Editors mount lazily as cards approach the viewport, without an Edit button.
-  Small diffs show at full height; large unchanged gaps collapse with clickable
-  expanders. Cards taller than 600px have an **Expand / Collapse** toggle.
+  Files render inline at full height; large unchanged gaps collapse with
+  clickable expanders so you can scroll through the whole file.
 - **Collapse a file**: the caret in each file card's header collapses/expands
   that card's body so you can skip past large files without scrolling.
 - **Inline editing** (editable views only): **Save** enables when you edit;
@@ -145,8 +146,9 @@ Coverage:
 
 - Editable non-binary cards auto-mount an inline Monaco diff editor (no "Edit"
   button), with live syntax highlighting.
-- Small files render uncapped; a tall single change is capped at ~600px with a
-  working Expand/Collapse toggle.
+- Files render full height inline with no snippet Expand/Collapse cap.
+- The file list is collapsed by default; the **Files** button toggles it and the
+  choice persists.
 - The per-card header caret collapses and restores a file's body.
 - Large multi-hunk files hide unchanged regions and expand on demand.
 - Editing enables Save; both the Save button and the ⌘/Ctrl+S keybinding persist
