@@ -111,6 +111,8 @@ details.
 - **Compare…**: diff any two revisions (or one commit vs your working tree). The
   same panel lists this repo's history below the inputs, so you can reopen any
   past diff.
+- **Wrap**: the top-bar button toggles soft word wrap across every editor (and
+  new ones as they mount); your choice is remembered.
 
 ## Testing
 
@@ -161,6 +163,8 @@ Coverage:
   with no Save button and writes refused by the API.
 - The **Compare…** panel exposes the revision inputs and lists this repo's
   history below them, and opening a history entry switches the diff.
+- The **Wrap** button toggles word wrap on for every editor (and editors mounted
+  afterward), and the choice persists across a reload.
 
 ## Project layout
 

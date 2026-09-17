@@ -40,6 +40,7 @@ const App = {
   session: null,
   _editors: [],
   _observer: null,
+  _wrap: false,
 };
 
 function disposeEditors() {
@@ -174,6 +175,7 @@ function diffOpts(readOnly) {
     overviewRulerLanes: 0,
     lineNumbersMinChars: 4,
     fontSize: 12.5,
+    wordWrap: App._wrap ? 'on' : 'off',
     scrollbar: { vertical: 'hidden', alwaysConsumeMouseWheel: false },
   };
 }
@@ -390,6 +392,11 @@ async function mountDiffEditor(f, body, head, actions) {
     saveBtn.addEventListener('click', save);
   }
   editors.push({
+    setWrap(on) {
+      if (disposed) return;
+      diffEditor.updateOptions({ wordWrap: on ? 'on' : 'off' });
+      fit();
+    },
     dispose() {
       disposed = true;
       cancelAnimationFrame(frame);
@@ -508,6 +515,23 @@ document.getElementById('filesBtn').addEventListener('click', () => {
   applyFilebar(open);
 });
 applyFilebar(localStorage.getItem(FILEBAR_KEY) === 'open');
+
+// Word wrap toggle. Applies to all editors (current + newly mounted); persists.
+const WRAP_KEY = 'diffui.wrap';
+function applyWrap(on) {
+  App._wrap = on;
+  const btn = document.getElementById('wrapBtn');
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  for (const ed of App._editors) ed.setWrap?.(on);
+}
+document.getElementById('wrapBtn').addEventListener('click', () => {
+  const on = !App._wrap;
+  localStorage.setItem(WRAP_KEY, on ? 'on' : 'off');
+  applyWrap(on);
+});
+// Set state before the first mount so new editors pick it up via diffOpts.
+applyWrap(localStorage.getItem(WRAP_KEY) === 'on');
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeModal();
