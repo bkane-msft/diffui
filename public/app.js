@@ -435,9 +435,14 @@ async function switchSpec(spec) {
   }
 }
 
-function openCompare() {
+async function openCompare() {
   const base = h('input', { placeholder: 'e.g. HEAD~3 or main', value: '' });
   const target = h('input', { placeholder: 'blank = working tree, or a commit', value: '' });
+
+  const historySection = h('div', { class: 'history-section' }, [
+    h('div', { class: 'hint' }, 'Loading history\u2026'),
+  ]);
+
   const node = h('div', {}, [
     h('h2', {}, 'Compare revisions'),
     h('div', { class: 'hint' }, 'Leave target blank to diff a commit against your working tree (editable). Set both for a historical, read-only diff.'),
@@ -455,41 +460,36 @@ function openCompare() {
         },
       }, 'Show diff'),
     ]),
+    h('h3', { class: 'history-heading' }, 'History \u2014 this repo'),
+    historySection,
   ]);
   openModal(node);
   base.focus();
-}
 
-async function openHistory() {
-  let data;
+  // Load past diffs for this repo and show them below the compare inputs.
   try {
-    data = await api('/api/history');
+    const data = await api('/api/history');
+    const items = data.entries.map((e) =>
+      h('li', {}, [
+        h('span', { class: 'tag' + (e.editable ? ' edit' : '') }, e.editable ? 'edit' : 'ro'),
+        h('span', { class: 'h-label', title: e.spec.join(' ') }, e.label || e.spec.join(' ')),
+        h('span', { class: 'h-time' }, new Date(e.ts).toLocaleString()),
+        h('button', { class: 'btn small', onclick: () => switchSpec(e.spec) }, 'Open'),
+      ])
+    );
+    historySection.replaceChildren(
+      data.entries.length
+        ? h('ul', { class: 'history-list' }, items)
+        : h('div', { class: 'hint' }, 'No history yet.')
+    );
   } catch (e) {
-    toast(e.message);
-    return;
+    historySection.replaceChildren(h('div', { class: 'hint' }, 'Could not load history: ' + e.message));
   }
-  const items = data.entries.map((e) =>
-    h('li', {}, [
-      h('span', { class: 'tag' + (e.editable ? ' edit' : '') }, e.editable ? 'edit' : 'ro'),
-      h('span', { class: 'h-label', title: e.spec.join(' ') }, e.label || e.spec.join(' ')),
-      h('span', { class: 'h-time' }, new Date(e.ts).toLocaleString()),
-      h('button', { class: 'btn small', onclick: () => switchSpec(e.spec) }, 'Open'),
-    ])
-  );
-  const node = h('div', {}, [
-    h('h2', {}, 'History \u2014 this repo'),
-    data.entries.length
-      ? h('ul', { class: 'history-list' }, items)
-      : h('div', { class: 'hint' }, 'No history yet.'),
-    h('div', { class: 'row' }, [h('button', { class: 'btn', onclick: closeModal }, 'Close')]),
-  ]);
-  openModal(node);
 }
 
 // ---- wire up -------------------------------------------------------------
 document.getElementById('refreshBtn').addEventListener('click', loadSession);
 document.getElementById('compareBtn').addEventListener('click', openCompare);
-document.getElementById('historyBtn').addEventListener('click', openHistory);
 
 // Sidebar (file list) collapse. Collapsed by default; the choice persists.
 const FILEBAR_KEY = 'diffui.filebar';

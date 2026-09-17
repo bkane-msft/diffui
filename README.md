@@ -108,8 +108,9 @@ details.
   `⌘S` / `Ctrl+S` saves to disk and re-diffs. Read-only comparisons (historical,
   `--staged`, ranges) and deleted files render the same Monaco diff but read-only
   — no Save, no writes.
-- **Compare…**: diff any two revisions (or one commit vs your working tree).
-- **History**: reopen any past diff for this repo.
+- **Compare…**: diff any two revisions (or one commit vs your working tree). The
+  same panel lists this repo's history below the inputs, so you can reopen any
+  past diff.
 
 ## Testing
 
@@ -158,6 +159,8 @@ Coverage:
 - Binary files show the binary banner (no Monaco). Deleted files and read-only
   specs (e.g. `--staged`) render a read-only Monaco diff — syntax-highlighted but
   with no Save button and writes refused by the API.
+- The **Compare…** panel exposes the revision inputs and lists this repo's
+  history below them, and opening a history entry switches the diff.
 
 ## Project layout
 
