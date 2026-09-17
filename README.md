@@ -102,6 +102,9 @@ details.
   Editors mount lazily as cards approach the viewport, without an Edit button.
   Files render inline at full height; large unchanged gaps collapse with
   clickable expanders so you can scroll through the whole file.
+- **New files included**: in working-tree views, brand-new (untracked) files
+  that `git diff` ignores are shown as added files — editable and savable like
+  any other, honoring `.gitignore`.
 - **Collapse a file**: the caret in each file card's header collapses/expands
   that card's body so you can skip past large files without scrolling.
 - **Inline editing** (editable views only): **Save** enables when you edit;
@@ -165,6 +168,9 @@ Coverage:
   history below them, and opening a history entry switches the diff.
 - The **Wrap** button toggles word wrap on for every editor (and editors mounted
   afterward), and the choice persists across a reload.
+- Brand-new (untracked) files appear in working-tree views as added files —
+  editable and savable with correct add counts — while `.gitignore`d files stay
+  hidden and read-only (`--cached`) views never surface them.
 
 ## Project layout
 

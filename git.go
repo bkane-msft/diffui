@@ -47,6 +47,34 @@ func gitText(dir string, args ...string) (string, error) {
 	return string(b), err
 }
 
+// gitDiffOutput runs a git diff-family command, tolerating exit code 1 (which
+// diff uses to signal "differences found") and returning stdout in that case.
+func gitDiffOutput(dir string, args ...string) ([]byte, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
+			return out.Bytes(), nil
+		}
+		msg := strings.TrimSpace(errb.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return nil, fmt.Errorf("%s", msg)
+	}
+	return out.Bytes(), nil
+}
+
+// isUntracked reports whether file exists in the working tree but is not tracked
+// in the index (a brand-new file that `git diff` would otherwise ignore).
+func isUntracked(dir, file string) bool {
+	_, err := gitOutput(dir, "ls-files", "--error-unmatch", "--", file)
+	return err != nil
+}
+
 func repoRoot(dir string) (string, error) {
 	s, err := gitText(dir, "rev-parse", "--show-toplevel")
 	return strings.TrimSpace(s), err
@@ -176,6 +204,45 @@ func numstat(spec []string, dir string) (map[string]counts, error) {
 	return m, nil
 }
 
+// untrackedFiles lists working-tree files git is not tracking (respecting
+// .gitignore), as new-file (status "A") entries with add/binary counts computed
+// from disk. `git diff` omits these, so they are folded in for working-tree views.
+func untrackedFiles(dir string) ([]FileEntry, error) {
+	b, err := gitOutput(dir, "ls-files", "--others", "--exclude-standard", "-z")
+	if err != nil {
+		return nil, err
+	}
+	entries := []FileEntry{}
+	for _, p := range splitNul(b) {
+		if p == "" {
+			continue
+		}
+		e := FileEntry{Status: "A", Path: p}
+		if data, rerr := readWorkingFile(dir, p); rerr == nil {
+			if bytes.IndexByte([]byte(data), 0) >= 0 {
+				e.Binary = true
+			} else {
+				e.Additions = lineCount(data)
+			}
+		}
+		entries = append(entries, e)
+	}
+	return entries, nil
+}
+
+// lineCount reports the number of lines in s, matching git's diff accounting for
+// a newly added file (a final line without a trailing newline still counts).
+func lineCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	n := strings.Count(s, "\n")
+	if !strings.HasSuffix(s, "\n") {
+		n++
+	}
+	return n
+}
+
 func fileList(spec []string, dir string) ([]FileEntry, error) {
 	eff := effectiveSpec(spec, dir)
 	statuses, err := nameStatus(eff, dir)
@@ -193,11 +260,26 @@ func fileList(spec []string, dir string) ([]FileEntry, error) {
 			statuses[i].Binary = c.binary
 		}
 	}
+	// Working-tree views also surface brand-new (untracked) files, which
+	// `git diff` never reports.
+	if _, _, targetWorking := diffSides(spec); targetWorking {
+		untracked, uerr := untrackedFiles(dir)
+		if uerr != nil {
+			return nil, uerr
+		}
+		statuses = append(statuses, untracked...)
+	}
 	return statuses, nil
 }
 
 func fileDiff(spec []string, file, dir string) (string, error) {
 	eff := effectiveSpec(spec, dir)
+	// Untracked files never appear in `git diff`; diff them against nothing so
+	// working-tree views show (and count) their contents as all-additions.
+	if _, _, targetWorking := diffSides(spec); targetWorking && isUntracked(dir, file) {
+		out, err := gitDiffOutput(dir, "diff", "--no-color", "--no-index", "--", os.DevNull, file)
+		return string(out), err
+	}
 	args := append([]string{"diff", "--no-color"}, eff...)
 	args = append(args, "--", file)
 	return gitText(dir, args...)

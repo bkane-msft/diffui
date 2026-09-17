@@ -24,6 +24,45 @@ func TestFileListAndCounts(t *testing.T) {
 	assert.Equal(t, "A", c.Status)
 }
 
+func TestFileListIncludesUntracked(t *testing.T) {
+	dir := newTestRepo(t)
+	// A brand-new file that has never been `git add`ed.
+	writeFile(t, dir, "untracked.txt", "one\ntwo\nthree\n")
+
+	// Working-tree view surfaces it as an added file with add counts.
+	files, err := fileList([]string{"HEAD"}, dir)
+	require.NoError(t, err)
+	u := findFile(files, "untracked.txt")
+	require.NotNil(t, u, "expected untracked.txt in %+v", files)
+	assert.Equal(t, "A", u.Status)
+	assert.Equal(t, 3, u.Additions)
+	assert.Equal(t, 0, u.Deletions)
+	assert.False(t, u.Binary)
+
+	// Its diff renders as all-additions even though `git diff` ignores it.
+	diff, err := fileDiff([]string{"HEAD"}, "untracked.txt", dir)
+	require.NoError(t, err)
+	assert.Contains(t, diff, "+one")
+	assert.Contains(t, diff, "+three")
+
+	// Read-only views (e.g. --cached) do not surface untracked files.
+	staged, err := fileList([]string{"--cached"}, dir)
+	require.NoError(t, err)
+	assert.Nil(t, findFile(staged, "untracked.txt"), "untracked leaked into --cached view")
+}
+
+func TestUntrackedFileHonorsGitignore(t *testing.T) {
+	dir := newTestRepo(t)
+	writeFile(t, dir, ".gitignore", "ignored.log\n")
+	writeFile(t, dir, "ignored.log", "noise\n")
+	writeFile(t, dir, "shown.txt", "kept\n")
+
+	files, err := fileList([]string{"HEAD"}, dir)
+	require.NoError(t, err)
+	assert.NotNil(t, findFile(files, "shown.txt"))
+	assert.Nil(t, findFile(files, "ignored.log"), "ignored file should not appear")
+}
+
 func TestFileDiffContainsChange(t *testing.T) {
 	dir := newTestRepo(t)
 	diff, err := fileDiff([]string{"HEAD"}, "a.txt", dir)
